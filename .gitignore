@@ -127,3 +127,16 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+
+# some files
+*.txt
+*.log
+*.xlsx
+*.png
+*.csv
+
+# some folders
+logs
+browsermob-proxy
+user_data
