@@ -136,19 +136,21 @@ class Digiturkplay:
 
     # check login
     def check_login(self):
-        if self.driver is None: return
+        if self.driver is None: return False
 
         try:
             to_main = self.driver.find_element_by_class_name("ga-ab-main")
-            if to_main.id:
-                closeButton = helper.find_element_by_css_selector("a#close")
-                actionchains.move_to_element(closeButton)
-                actionchains.click(closeButton)
-                actionchains.perform()
-                time.sleep(5)
+            if to_main.get_attribute("id") == "login-link":
+                return False
+            if "profil" in to_main.get_attribute("href"):
+                self.write_log("[checking login] with login status")
+                return True
 
         except Exception as e:
             self.write_log(e)
+
+        self.write_log("[checking login] without login status")
+        return False
 
     # open list page
     def open_list_page(self):
@@ -158,6 +160,7 @@ class Digiturkplay:
         try:
             self.driver.get(self.list_url)
             time.sleep(10)
+            self.check_login()
             
             self.pass_block_side()
         except Exception as e:
@@ -209,6 +212,7 @@ class Digiturkplay:
                 self.driver.execute_script("arguments[0].click();", a_target_elm)
                 # self.get_desired_capabilities("find_open_target")
                 time.sleep(10)
+                self.check_login()
 
                 return True
 
@@ -353,17 +357,25 @@ class Digiturkplay:
             events = [json.loads(entry['message'])['message'] for entry in browser_log]
             events = [event for event in events if 'Network.response' in event['method']]
             # results = []
+            result_exist = False
+            
             for event in events:
                 try:
                     params = event['params']
                     response = params['response']
                     url = response['url']
+                    # self.write_log("[{}] desired_capabilities url is {}".format(tag, url))
                     if '/{}'.format(self.target_url_pattern) in str(url):
                         # results.append(response)
                         self.target_url = str(url)
-                        self.write_log(url)
+                        result_exist = True
+                        self.write_log("[{}] desired_capabilities url {} has pattern {}".format(
+                            tag, url, self.target_url_pattern))
                 except:
                     pass
+            
+            if not result_exist:
+                self.write_log("[{}] desired_capabilities urls have never pattern {}".format(tag, self.target_url_pattern))
         except Exception as e:
             self.write_log(e)
 
