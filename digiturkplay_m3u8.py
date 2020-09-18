@@ -496,6 +496,7 @@ class Digiturkplay:
 
         wget_files = []
         
+        # wget
         for url in self.mp4_urls:
             command = 'wget "{}"'.format(url)
             self.write_log(command)
@@ -510,6 +511,7 @@ class Digiturkplay:
             self.write_log('wget files are less.')
             # return
         
+        # ffmpeg
         command = 'ffmpeg'
         for download_file in wget_files:
             command = '{} -i "{}"'.format(command, download_file)
@@ -522,6 +524,16 @@ class Digiturkplay:
             self.run_mysql()
         else:
             self.write_log('ffmpeg failed.')
+
+        # remove
+        for download_file in wget_files:
+            command = 'rm -rf {}'.format(download_file)
+            self.write_log(command)
+            result_cmd = os.system(command)
+            if result_cmd == 0:
+                self.write_log('rm success')
+            else:
+                self.write_log('rm failed.')
 
     # run all performance
     def run(self):
