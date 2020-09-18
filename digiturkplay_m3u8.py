@@ -465,7 +465,6 @@ class Digiturkplay:
 
     # get .mp4 urls
     def get_mp4_urls(self):
-        self.target_urls = ['https://ny1-s7.dt.ercdn.com/s7/mpd/c/EM/PT_MUL_DASH_0000050861/video_831892_288p.mp4', 'https://ny1-s7.dt.ercdn.com/s7/mpd/c/EM/PT_MUL_DASH_0000050861/MASTERCHEF_17EYLUL_102006.mp4']
         if len(self.target_urls) < 2: return
 
         self.write_log("get mp4 urls from array")
@@ -527,7 +526,6 @@ class Digiturkplay:
     # run all performance
     def run(self):
         try:
-            '''
             self.openBrowser()
             self.login()
             self.open_list_page()
@@ -539,9 +537,8 @@ class Digiturkplay:
                     self.download_m3u8()
                 elif self.target_key == 'MP4':
                     self.get_mp4()
-                    '''
-            self.get_mp4_urls()
-            self.download_mp4()
+                    self.get_mp4_urls()
+                    self.download_mp4()
 
         except Exception as e:
             self.write_log(e)
