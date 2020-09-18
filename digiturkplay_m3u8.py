@@ -24,6 +24,16 @@ class Digiturkplay:
     login_url = base_url + "kullanici/giris?r=%2Fkullanici%2Fgiris"
     list_url = base_url + "ulusal/masterchef-turkiye"
     REQUEST_TIME_OUT = 300
+    enabled_targets = {
+        'M3U8' : {
+            'extension' : '.m3u8',
+            'keywords' : ['/.m3u8'],
+        },
+        'MP4' : {
+            'extension' : '.mp4',
+            'keywords' : ['MASTER', 'video_'],
+        },
+    }
 
     # initialize
     def __init__(self, email="bahriinceler@hotmail.com", password="2334323a1"):
@@ -37,12 +47,15 @@ class Digiturkplay:
         self.is_checkable = True
         self.result = False
         self.str_result = ""
+        self.target_key = 'MP4'
+        self.target_url_pattern = self.enabled_targets[self.target_key]['extension']
+        self.target_keywords = self.enabled_targets[self.target_key]['keywords']
+        self.target_urls = []
         self.m3u8_urls = []
+        self.mp4_urls = []
         self.filters = None
         self.filepath = None
         self.download_url = None
-        self.target_url_pattern = '.m3u8'
-        self.target_url = None
         self.host=None,
         self.port=None,
         self.user=None,
@@ -63,6 +76,36 @@ class Digiturkplay:
         # filters
         if self.filters is not None:
             self.filters = self.filters.split(",")
+
+    # connect and run sql query
+    def run_mysql(self): 
+        if not self.result: return
+
+        self.write_log("mysql database connect")
+        try:
+            conn = mysql.connector.connect(
+                host=self.host,
+                port=self.port,
+                user=self.user,
+                passwd=self.passwd,
+                database=self.database,
+                use_unicode=True,
+                charset="utf8"
+            )
+            
+            cursor = conn.cursor()
+
+            if conn and cursor:
+                qry = """UPDATE {} SET is_downloaded = '1', `source_url` = %s WHERE id = %s""".format(self.table)
+                cursor.execute(qry, (self.download_url, self.row_id))
+                conn.commit()
+                self.write_log("mysql row updated")
+
+                cursor.close()
+                conn.close()
+
+        except Exception as e:
+            self.write_log(e)
 
     # open browser and log file
     def openBrowser(self):
@@ -238,17 +281,6 @@ class Digiturkplay:
 
         except Exception as e:
             self.write_log(e)
- 
-    # get .m3u8
-    def get_m3u8(self):
-        if self.driver is None: return
-
-        try:
-            self.get_desired_capabilities("get_m3u8 first")
-            time.sleep(10)
-            # self.get_desired_capabilities("get_m3u8 second")
-        except Exception as e:
-            self.write_log(e)
 
     # close browser and file
     def closeBrowser(self):
@@ -286,66 +318,26 @@ class Digiturkplay:
                 if request.response:
                     str_url = "{}".format(request.url)
                     str_body = "{}".format(request.response.body)
-                    if '/{}'.format(self.target_url_pattern) in str_url:
-                        # self.write_log_file({
-                            # 'url' : str_url,
-                            # 'status_code' : request.response.status_code,
-                            # 'Content-Type' : request.response.headers['Content-Type'],
-                            # 'body' : str_body
-                        # })
-                        self.target_url = str_url
-                        self.write_log_file(str_body)
-                        self.get_m3u8_url()
-                        self.write_log("[{}] got m3u8 url".format(tag))
+                    for pattern in self.target_keywords:
+                        if pattern in str_url:
+                            # self.write_log_file({
+                                # 'url' : str_url,
+                                # 'status_code' : request.response.status_code,
+                                # 'Content-Type' : request.response.headers['Content-Type'],
+                                # 'body' : str_body
+                            # })
+                            self.target_urls.append(str_url)
+                            self.write_log_file(str_body)
+                            self.get_m3u8_url()
+                            self.write_log("[{}] got m3u8 url".format(tag))
+
+            self.target_urls = list(set(self.target_urls))
 
             self.write_log("[{}] total requests count is {}.".format(tag, cnt_req))
 
         except Exception as e:
             self.write_log(tag)
             self.write_log(e)
-
-    # get .m3u8 url
-    def get_m3u8_url(self):
-        if self.str_result != "":
-            self.write_log("get m3u8 url from string")
-            patterns = self.str_result.split("\n")
-            if len(patterns) < 2:
-                patterns = self.str_result.split("\\n")
-            # self.write_log(patterns)
-
-            for word in patterns:
-                # self.write_log(word)
-                if len(word) > 5 and word[-5:].lower() == self.target_url_pattern:
-                    self.m3u8_urls.append(word)
-                    # self.write_log(self.m3u8_urls)
-                    self.result = True
-
-    # download m3u8 to filepath using filters
-    def download(self):
-        if self.filters is None or self.filepath is None or len(self.m3u8_urls) == 0 or not self.result: return
-        self.write_log("run download command")
-        self.write_log(self.m3u8_urls)
-
-        download_filename = self.m3u8_urls[0]
-        for f in self.filters:
-            for url in self.m3u8_urls:
-                f = f.strip()
-                if f != "" and f in url:
-                    download_filename = url
-        
-        subpath = self.target_url.split(self.target_url_pattern)[0]
-
-        self.download_url = '{}{}'.format(subpath, download_filename)
-        command = 'ffmpeg -i "{}" -c copy {}'.format(self.download_url, self.filepath)
-        self.write_log(command)
-
-        result_cmd = os.system(command)
-        if result_cmd == 0 or True:
-            self.write_log('ffmpeg success')
-
-            self.run_mysql()
-        else:
-            self.write_log('ffmpeg failed.')
 
     # get responses using desired_capabilities
     def get_desired_capabilities(self, tag=""):
@@ -365,74 +357,47 @@ class Digiturkplay:
                     response = params['response']
                     url = response['url']
                     # self.write_log("[{}] desired_capabilities url is {}".format(tag, url))
-                    if '/{}'.format(self.target_url_pattern) in str(url):
-                        # results.append(response)
-                        self.target_url = str(url)
-                        result_exist = True
-                        self.write_log("[{}] desired_capabilities url {} has pattern {}".format(
-                            tag, url, self.target_url_pattern))
+                    for pattern in self.target_keywords:
+                        if pattern in str(url):
+                            # results.append(response)
+                            self.target_urls.append(str(url))
+                            result_exist = True
+                            self.write_log("[{}] desired_capabilities url {} has pattern {}".format(
+                                tag, url, self.target_url_pattern))
                 except:
                     pass
+
+            self.target_urls = list(set(self.target_urls))
             
-            if not result_exist:
+            if result_exist:
+                self.write_log("[{}] desired_capabilities urls:".format(tag))
+                self.write_log(self.target_urls)
+            else:
                 self.write_log("[{}] desired_capabilities urls have never pattern {}".format(tag, self.target_url_pattern))
         except Exception as e:
             self.write_log(e)
+ 
+    # get .m3u8
+    def get_m3u8(self):
+        if self.driver is None: return
 
-    # run all performance
-    def run(self):
         try:
-            self.openBrowser()
-            self.login()
-            self.open_list_page()
-            if self.find_open_target():
-                self.confirm_modal()
-                self.get_m3u8()
-                self.request_m3u8()
-                self.download()
-
-        except Exception as e:
-            self.write_log(e)
-        finally:
-            self.closeBrowser()
-
-    # connect and run sql query
-    def run_mysql(self): 
-        if not self.result: return
-
-        self.write_log("mysql database connect")
-        try:
-            conn = mysql.connector.connect(
-                host=self.host,
-                port=self.port,
-                user=self.user,
-                passwd=self.passwd,
-                database=self.database,
-                use_unicode=True,
-                charset="utf8"
-            )
-            
-            cursor = conn.cursor()
-
-            if conn and cursor:
-                qry = """UPDATE {} SET is_downloaded = '1', `source_url` = %s WHERE id = %s""".format(self.table)
-                cursor.execute(qry, (self.download_url, self.row_id))
-                conn.commit()
-                self.write_log("mysql row updated")
-
-                cursor.close()
-                conn.close()
-
+            self.get_desired_capabilities("get_m3u8 first")
+            time.sleep(10)
+            # self.get_desired_capabilities("get_m3u8 second")
         except Exception as e:
             self.write_log(e)
 
     # request .m3u8
     def request_m3u8(self):
-        if self.target_url is None: return
+        if len(self.target_urls) == 0: return
 
         self.write_log("request for m3u8")
+        if len(self.target_urls) == 0: return
+
+        request_url = self.target_urls[0]
         try:
-            response = requests.get(self.target_url, timeout=self.REQUEST_TIME_OUT, verify=False)
+            response = requests.get(request_url, timeout=self.REQUEST_TIME_OUT, verify=False)
             if response.status_code == 200:
                 self.write_log(response.content)
                 self.write_log_file(response.content)
@@ -441,6 +406,147 @@ class Digiturkplay:
                 raise Exception("request failed to run by returning code of {}.".format(response.status_code))
         except Exception as e:
             self.write_log(e)
+
+    # get .m3u8 url
+    def get_m3u8_url(self):
+        if self.str_result != "":
+            self.write_log("get m3u8 url from string")
+            patterns = self.str_result.split("\n")
+            if len(patterns) < 2:
+                patterns = self.str_result.split("\\n")
+            # self.write_log(patterns)
+
+            for word in patterns:
+                # self.write_log(word)
+                if len(word) > 5 and word[-5:].lower() == self.target_url_pattern:
+                    self.m3u8_urls.append(word)
+                    # self.write_log(self.m3u8_urls)
+                    self.result = True
+
+    # download m3u8 to filepath using filters
+    def download_m3u8(self):
+        if self.filters is None or self.filepath is None or len(self.m3u8_urls) == 0 or not self.result: return
+        self.write_log("run download m3u8 command")
+        self.write_log(self.m3u8_urls)
+
+        download_filename = self.m3u8_urls[0]
+        for f in self.filters:
+            for url in self.m3u8_urls:
+                f = f.strip()
+                if f != "" and f in url:
+                    download_filename = url
+        
+        if len(self.target_urls) > 0:
+            subpath = self.target_urls[0].split(self.target_url_pattern)[0]
+        else:
+            return
+
+        self.download_url = '{}{}'.format(subpath, download_filename)
+        command = 'ffmpeg -i "{}" -c copy {}'.format(self.download_url, self.filepath)
+        self.write_log(command)
+
+        result_cmd = os.system(command)
+        if result_cmd == 0 or True:
+            self.write_log('ffmpeg success')
+
+            self.run_mysql()
+        else:
+            self.write_log('ffmpeg failed.')
+            
+    # get .mp4
+    def get_mp4(self):
+        if self.driver is None: return
+
+        try:
+            self.get_desired_capabilities("get_mp4 first")
+            time.sleep(10)
+        except Exception as e:
+            self.write_log(e)
+
+    # get .mp4 urls
+    def get_mp4_urls(self):
+        self.target_urls = ['https://ny1-s7.dt.ercdn.com/s7/mpd/c/EM/PT_MUL_DASH_0000050861/video_831892_288p.mp4', 'https://ny1-s7.dt.ercdn.com/s7/mpd/c/EM/PT_MUL_DASH_0000050861/MASTERCHEF_17EYLUL_102006.mp4']
+        if len(self.target_urls) < 2: return
+
+        self.write_log("get mp4 urls from array")
+        
+        try:
+            self.result = True
+            self.mp4_urls = [None] * len(self.target_keywords)
+
+            for i, pattern in enumerate(self.target_keywords, start=0):
+                self.mp4_urls[i] = None
+
+                for url in self.target_urls:
+                    if self.mp4_urls[i] is None and pattern in url and len(url) > 5 and url[-4:].lower() == self.target_url_pattern:
+                        self.mp4_urls[i] = url
+
+                if self.mp4_urls[i] is None:
+                    self.result = False
+
+        except Exception as e:
+            self.result = False
+            self.write_log(e)
+
+    # download m3u8 to filepath using filters
+    def download_mp4(self):
+        if self.filters is None or self.filepath is None or not self.result: return
+
+        self.write_log("run download mp4 command")
+        self.write_log(self.mp4_urls)
+
+        wget_files = []
+        
+        for url in self.mp4_urls:
+            command = 'wget "{}"'.format(url)
+            self.write_log(command)
+            result_cmd = os.system(command)
+            if result_cmd == 0:
+                wget_files.append(url.split('/')[-1])
+                self.write_log('wget success')
+            else:
+                self.write_log('wget failed.')
+        
+        if len(wget_files) < len(self.mp4_urls):
+            self.write_log('wget files are less.')
+            # return
+        
+        command = 'ffmpeg'
+        for download_file in wget_files:
+            command = '{} -i "{}"'.format(command, download_file)
+        command = '{} -c copy -map 0:v:0 -map 1:a:0 {}'.format(command, self.filepath)
+        self.write_log(command)
+
+        result_cmd = os.system(command)
+        if result_cmd == 0:
+            self.write_log('ffmpeg success')
+            self.run_mysql()
+        else:
+            self.write_log('ffmpeg failed.')
+
+    # run all performance
+    def run(self):
+        try:
+            '''
+            self.openBrowser()
+            self.login()
+            self.open_list_page()
+            if self.find_open_target():
+                self.confirm_modal()
+                if self.target_key == 'M3U8':
+                    self.get_m3u8()
+                    self.request_m3u8()
+                    self.download_m3u8()
+                elif self.target_key == 'MP4':
+                    self.get_mp4()
+                    '''
+            self.get_mp4_urls()
+            self.download_mp4()
+
+        except Exception as e:
+            self.write_log(e)
+        finally:
+            self.closeBrowser()
 
 
 if __name__ == "__main__":
