@@ -487,9 +487,9 @@ class Digiturkplay:
             self.result = False
             self.write_log(e)
 
-    # download m3u8 to filepath using filters
+    # download mp4 and merge
     def download_mp4(self):
-        if self.filters is None or self.filepath is None or not self.result: return
+        if self.filepath is None or not self.result: return
 
         self.write_log("run download mp4 command")
         self.write_log(self.mp4_urls)
