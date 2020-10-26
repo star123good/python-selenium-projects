@@ -16,43 +16,26 @@ import requests
 
 
 
-class DigiturkPlayer:
+class YoutubePlayer:
     '''
-    DigiturkPlayer Scrape and Get .m3u8
+    YoutubePlayer Scrape and Get url
     '''
-    base_url = "https://www.digiturkplay.com/"
-    login_url = base_url + "kullanici/giris?r=%2Fkullanici%2Fgiris"
-    list_url = base_url + "ulusal/masterchef-turkiye"
+    base_url = "https://www.youtube.com/"
     REQUEST_TIME_OUT = 300
-    enabled_targets = {
-        'M3U8' : {
-            'extension' : '.m3u8',
-            'keywords' : ['/.m3u8'],
-        },
-        'MP4' : {
-            'extension' : '.mp4',
-            'keywords' : ['MASTER', 'video_'],
-        },
-    }
 
     # initialize
-    def __init__(self, email="bahriinceler@hotmail.com", password="2334323a1"):
+    def __init__(self, email, password):
         self.driver = None
         self.email = email
         self.password = password
         self.open_browser = False
         self.log_print = True
-        self.log_filename = "digiturkplayer_log.txt"
+        self.log_filename = "youtubeplayer_log.txt"
         self.log_file = None
         self.is_checkable = True
         self.result = False
         self.str_result = ""
-        self.target_key = 'MP4'
-        self.target_url_pattern = self.enabled_targets[self.target_key]['extension']
-        self.target_keywords = self.enabled_targets[self.target_key]['keywords']
         self.target_urls = []
-        self.m3u8_urls = []
-        self.mp4_urls = []
         self.filters = None
         self.filepath = None
         self.download_url = None
@@ -559,6 +542,6 @@ class DigiturkPlayer:
 
 
 if __name__ == "__main__":
-    handler = DigiturkPlayer()
+    handler = YoutubePlayer(email="phoenix930st@gmail.com", password='#123$QWe"')
     handler.set_params(sys.argv)
     handler.run()
