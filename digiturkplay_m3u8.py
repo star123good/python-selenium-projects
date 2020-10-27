@@ -36,7 +36,7 @@ class DigiturkPlayer:
     }
 
     # initialize
-    def __init__(self, email="bahriinceler@hotmail.com", password="2334323a1"):
+    def __init__(self, email, password):
         self.driver = None
         self.email = email
         self.password = password
@@ -559,6 +559,6 @@ class DigiturkPlayer:
 
 
 if __name__ == "__main__":
-    handler = DigiturkPlayer()
+    handler = DigiturkPlayer(email="bahriinceler@hotmail.com", password="2334323a1")
     handler.set_params(sys.argv)
     handler.run()
